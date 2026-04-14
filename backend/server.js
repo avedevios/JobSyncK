@@ -31,7 +31,7 @@ app.get('/vacancies/:id', async (req, res) => {
 
 // POST /vacancies — добавить вакансию
 app.post('/vacancies', async (req, res) => {
-  const { role, company, applied_at, applied = 0, status = 'saved', url = '', notes = '', job_type = '', apply_url = '', description = '', posted_at = '' } = req.body;
+  const { role, company, applied_at, applied = 0, status = 'saved', url = '', notes = '', job_type = '', apply_url = '', description = '', posted_at = '', location = '' } = req.body;
 
   if (!role || !company || !applied_at) {
     return res.status(400).json({ error: 'role, company и applied_at обязательны' });
@@ -39,8 +39,8 @@ app.post('/vacancies', async (req, res) => {
 
   const db = await getDb();
   db.run(
-    'INSERT INTO vacancies (role, company, applied_at, applied, status, url, notes, job_type, apply_url, description, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [role, company, applied_at, applied ? 1 : 0, status, url, notes, job_type, apply_url, description, posted_at]
+    'INSERT INTO vacancies (role, company, applied_at, applied, status, url, notes, job_type, apply_url, description, posted_at, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [role, company, applied_at, applied ? 1 : 0, status, url, notes, job_type, apply_url, description, posted_at, location]
   );
   save();
 
@@ -58,7 +58,7 @@ app.patch('/vacancies/:id', async (req, res) => {
   const { columns, values } = existing[0];
   const vacancy = Object.fromEntries(columns.map((col, i) => [col, values[0][i]]));
 
-  const { role, company, applied_at, applied, status, url, notes, job_type, apply_url, description, posted_at } = req.body;
+  const { role, company, applied_at, applied, status, url, notes, job_type, apply_url, description, posted_at, location } = req.body;
   const updated = {
     role: role ?? vacancy.role,
     company: company ?? vacancy.company,
@@ -71,11 +71,12 @@ app.patch('/vacancies/:id', async (req, res) => {
     apply_url: apply_url ?? vacancy.apply_url,
     description: description ?? vacancy.description,
     posted_at: posted_at ?? vacancy.posted_at,
+    location: location ?? vacancy.location,
   };
 
   db.run(
-    'UPDATE vacancies SET role=?, company=?, applied_at=?, applied=?, status=?, url=?, notes=?, job_type=?, apply_url=?, description=?, posted_at=? WHERE id=?',
-    [updated.role, updated.company, updated.applied_at, updated.applied, updated.status, updated.url, updated.notes, updated.job_type, updated.apply_url, updated.description, updated.posted_at, req.params.id]
+    'UPDATE vacancies SET role=?, company=?, applied_at=?, applied=?, status=?, url=?, notes=?, job_type=?, apply_url=?, description=?, posted_at=?, location=? WHERE id=?',
+    [updated.role, updated.company, updated.applied_at, updated.applied, updated.status, updated.url, updated.notes, updated.job_type, updated.apply_url, updated.description, updated.posted_at, updated.location, req.params.id]
   );
   save();
 

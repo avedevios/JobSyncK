@@ -181,8 +181,60 @@ function getPostedDate() {
 }
 
 /**
+ * Gets the job location from the DOM.
+ * Handles both the search-results right panel and the /jobs/view/ page.
+ * @returns {string}
+ */
+function getJobLocation() {
+  // 1. In the right-panel detail view: the location is the first <span> inside
+  //    the <p> that also contains "ago" or "people clicked apply".
+  //    That <p> sits inside [data-sdui-screen*="SemanticJobDetails"].
+  const detailPanel = document.querySelector('[data-sdui-screen*="SemanticJobDetails"]');
+  if (detailPanel) {
+    const paragraphs = detailPanel.querySelectorAll('p');
+    for (const p of paragraphs) {
+      const text = p.textContent;
+      if (/ago|people clicked/i.test(text)) {
+        // First span is the location, e.g. "Winnipeg, MB"
+        const firstSpan = p.querySelector('span');
+        if (firstSpan) {
+          const loc = firstSpan.textContent.trim();
+          if (loc && loc.length > 1) return loc;
+        }
+      }
+    }
+  }
+
+  // 2. Classic /jobs/view/ page selectors
+  const classicSelectors = [
+    '.top-card-layout__bullet',
+    '.jobs-unified-top-card__bullet',
+    '.job-details-jobs-unified-top-card__bullet',
+    '[class*="top-card-layout__bullet"]',
+    '[class*="unified-top-card__bullet"]',
+  ];
+  for (const sel of classicSelectors) {
+    const el = document.querySelector(sel);
+    if (el && el.textContent.trim()) return el.textContent.trim();
+  }
+
+  // 3. Fallback: find a <p> whose text looks like "City, Province" or
+  //    "City, Province (On-site|Hybrid|Remote)" — short, no newlines
+  const allP = document.querySelectorAll('p');
+  for (const p of allP) {
+    if (p.children.length > 2) continue; // skip complex paragraphs
+    const text = p.textContent.trim();
+    if (/^[A-Za-zÀ-ÿ\s]+,\s*[A-Z]{2}(\s*\((On-site|Hybrid|Remote)\))?$/.test(text)) {
+      return text;
+    }
+  }
+
+  return '';
+}
+
+/**
  * Parses job data from the current page DOM.
- * @returns {{ role: string, company: string, url: string, apply_url: string, jobType: string, description: string, posted_at: string }}
+ * @returns {{ role: string, company: string, url: string, apply_url: string, jobType: string, location: string, description: string, posted_at: string }}
  */
 function parseJobData() {
   const role = trySelectors(ROLE_SELECTORS) || 'Unknown';
@@ -190,9 +242,10 @@ function parseJobData() {
   const jobType = getJobType();
   const url = getShareUrl();
   const apply_url = getApplyUrl();
+  const location = getJobLocation();
   const description = getJobDescription();
   const posted_at = getPostedDate();
-  return { role, company, url, apply_url, jobType, description, posted_at };
+  return { role, company, url, apply_url, jobType, location, description, posted_at };
 }
 
 // Message listener

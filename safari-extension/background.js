@@ -27,6 +27,7 @@ function buildPayload(data) {
     url: data.url,
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
+    location: data.location || "",
     description: data.description || "",
     posted_at: data.posted_at || "",
   };

@@ -32,6 +32,7 @@ async function getDb() {
       apply_url TEXT DEFAULT '',
       description TEXT DEFAULT '',
       posted_at TEXT DEFAULT '',
+      location TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -41,6 +42,7 @@ async function getDb() {
   try { db.run("ALTER TABLE vacancies ADD COLUMN apply_url TEXT DEFAULT ''"); } catch (e) {}
   try { db.run("ALTER TABLE vacancies ADD COLUMN description TEXT DEFAULT ''"); } catch (e) {}
   try { db.run("ALTER TABLE vacancies ADD COLUMN posted_at TEXT DEFAULT ''"); } catch (e) {}
+  try { db.run("ALTER TABLE vacancies ADD COLUMN location TEXT DEFAULT ''"); } catch (e) {}
 
   save();
   return db;

@@ -18,6 +18,7 @@ function fillFields(data) {
   document.getElementById('field-jobtype').textContent = data.jobType || '';
   document.getElementById('field-url').textContent = data.url;
   document.getElementById('field-apply-url').textContent = data.apply_url || 'Not found';
+  document.getElementById('field-location').textContent = data.location || 'Unknown';
   document.getElementById('field-posted').textContent = data.posted_at || 'Unknown';
   document.getElementById('field-description').textContent = data.description ? data.description.substring(0, 150) + '...' : 'No description found';
 }
