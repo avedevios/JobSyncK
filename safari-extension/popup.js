@@ -17,6 +17,9 @@ function fillFields(data) {
   document.getElementById('field-company').textContent = data.company;
   document.getElementById('field-jobtype').textContent = data.jobType || '';
   document.getElementById('field-url').textContent = data.url;
+  document.getElementById('field-apply-url').textContent = data.apply_url || 'Not found';
+  document.getElementById('field-posted').textContent = data.posted_at || 'Unknown';
+  document.getElementById('field-description').textContent = data.description ? data.description.substring(0, 150) + '...' : 'No description found';
 }
 
 function showDuplicateWarning() {
@@ -76,7 +79,10 @@ async function saveJob(data) {
     applied: false,
     status: 'saved',
     url: data.url,
+    apply_url: data.apply_url || "",
     job_type: data.jobType || "",
+    description: data.description || "",
+    posted_at: data.posted_at || "",
   };
   try {
     const result = await sendMessageToBackground({ action: 'saveVacancy', data: payload });

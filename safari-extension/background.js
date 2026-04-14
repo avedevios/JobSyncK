@@ -25,7 +25,10 @@ function buildPayload(data) {
     applied: false,
     status: "saved",
     url: data.url,
+    apply_url: data.apply_url || "",
     job_type: data.jobType || "",
+    description: data.description || "",
+    posted_at: data.posted_at || "",
   };
 }
 

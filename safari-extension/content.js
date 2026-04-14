@@ -62,15 +62,137 @@ function getJobType() {
 }
 
 /**
+ * Returns a clean share URL for the job.
+ * @returns {string}
+ */
+function getShareUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentJobId = urlParams.get('currentJobId');
+  if (currentJobId) {
+    return `https://www.linkedin.com/jobs/view/${currentJobId}/`;
+  }
+  return window.location.origin + window.location.pathname;
+}
+
+/**
+ * Gets the apply URL from the DOM.
+ * @returns {string}
+ */
+function getApplyUrl() {
+  const applyLinks = document.querySelectorAll('a[aria-label*="Apply"], a[aria-label*="apply"], a.jobs-apply-button');
+  for (const link of applyLinks) {
+    if (link.href && link.href.startsWith('http')) {
+      // Decode LinkedIn redirect URLs if present
+      if (link.href.includes('linkedin.com/safety/go/')) {
+        try {
+          const urlObj = new URL(link.href);
+          const targetUrl = urlObj.searchParams.get('url');
+          if (targetUrl) {
+            return targetUrl; // URL automatically decoded
+          }
+        } catch (e) {
+          // Fallback to original
+        }
+      }
+      return link.href;
+    }
+  }
+
+  // Check for Easy Apply button
+  const easyApplyBtns = document.querySelectorAll('button[aria-label*="Easy Apply"], button[aria-label*="Easy apply"], button.jobs-apply-button');
+  for (const btn of easyApplyBtns) {
+    // If it's a button and not a link, it's usually an Easy Apply process that opens a modal
+    return 'Easy Apply on LinkedIn';
+  }
+
+  return '';
+}
+
+/**
+ * Gets the job description text from the DOM.
+ * @returns {string}
+ */
+function getJobDescription() {
+  const selectors = [
+    '#job-details',
+    '.jobs-description-content__text',
+    '.jobs-description__content',
+    'div.job-details-module__content',
+    'span[data-testid="expandable-text-box"]',
+    'div[data-sdui-component="com.linkedin.sdui.generated.jobseeker.dsl.impl.aboutTheJob"]',
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.textContent.trim() !== '') {
+      return (el.innerText || el.textContent).trim();
+    }
+  }
+  return '';
+}
+
+/**
+ * Calculates a standard "YYYY-MM-DD" date from a relative time string.
+ * @param {string} amountStr 
+ * @param {string} unitStr 
+ */
+function calculateDateFromRelative(amountStr, unitStr) {
+  const amount = parseInt(amountStr, 10);
+  const unit = unitStr.toLowerCase();
+  const date = new Date();
+  
+  if (unit === 'minute') date.setMinutes(date.getMinutes() - amount);
+  else if (unit === 'hour') date.setHours(date.getHours() - amount);
+  else if (unit === 'day') date.setDate(date.getDate() - amount);
+  else if (unit === 'week') date.setDate(date.getDate() - (amount * 7));
+  else if (unit === 'month') date.setMonth(date.getMonth() - amount);
+  
+  return date.toISOString().split("T")[0]; // e.g. "2024-05-20"
+}
+
+/**
+ * Parses the "X hours ago", "Y days ago" from the DOM and outputs actual date.
+ * @returns {string}
+ */
+function getPostedDate() {
+  // First, check if there's an exact hidden date span:
+  // e.g. <span class="visually-hidden">Posted on April 14, 2026, 9:43 AM</span>
+  const spans = document.querySelectorAll('span');
+  for (const span of spans) {
+    if (span.textContent.includes('Posted on ')) {
+      const dateStr = span.textContent.replace('Posted on', '').trim();
+      // Date string typically looks like "April 14, 2026, 9:43 AM"
+      const parsedDate = new Date(dateStr);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toISOString().split("T")[0]; // YYYY-MM-DD
+      }
+    }
+  }
+
+  // Fallback: search within primary description text for relative dates
+  const containers = document.querySelectorAll('div, p, span, strong');
+  for (const container of containers) {
+    const text = container.textContent.trim();
+    const match = text.match(/(?:^|\s)(\d+)\s+(minute|hour|day|week|month)s?\s+ago/i);
+    if (match && container.children.length === 0) { // prefer leaf nodes
+      return calculateDateFromRelative(match[1], match[2]);
+    }
+  }
+  return '';
+}
+
+/**
  * Parses job data from the current page DOM.
- * @returns {{ role: string, company: string, url: string, jobType: string }}
+ * @returns {{ role: string, company: string, url: string, apply_url: string, jobType: string, description: string, posted_at: string }}
  */
 function parseJobData() {
   const role = trySelectors(ROLE_SELECTORS) || 'Unknown';
   const company = trySelectors(COMPANY_SELECTORS) || 'Unknown';
   const jobType = getJobType();
-  const url = window.location.href;
-  return { role, company, url, jobType };
+  const url = getShareUrl();
+  const apply_url = getApplyUrl();
+  const description = getJobDescription();
+  const posted_at = getPostedDate();
+  return { role, company, url, apply_url, jobType, description, posted_at };
 }
 
 // Message listener
