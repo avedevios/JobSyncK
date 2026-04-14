@@ -25,7 +25,8 @@ function fillFields(data) {
 
 function showDuplicateWarning() {
   document.getElementById('duplicate-warning').classList.remove('hidden');
-  document.getElementById('btn-save-anyway').classList.remove('hidden');
+  document.getElementById('btn-save').classList.add('hidden');
+  document.getElementById('btn-update').classList.remove('hidden');
 }
 
 function showSaveResult(type, message) {
@@ -37,12 +38,12 @@ function showSaveResult(type, message) {
 
 function disableSaveButtons() {
   document.getElementById('btn-save').disabled = true;
-  document.getElementById('btn-save-anyway').disabled = true;
+  document.getElementById('btn-update').disabled = true;
 }
 
 function enableSaveButtons() {
   document.getElementById('btn-save').disabled = false;
-  document.getElementById('btn-save-anyway').disabled = false;
+  document.getElementById('btn-update').disabled = false;
 }
 
 function formatDate(date) {
@@ -82,6 +83,7 @@ async function saveJob(data) {
     url: data.url,
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
+    location: data.location || "",
     description: data.description || "",
     posted_at: data.posted_at || "",
   };
@@ -89,6 +91,35 @@ async function saveJob(data) {
     const result = await sendMessageToBackground({ action: 'saveVacancy', data: payload });
     if (result.success) {
       showSaveResult('success', 'Job saved ✓');
+    } else {
+      showSaveResult('error', result.error);
+      enableSaveButtons();
+    }
+  } catch (err) {
+    showSaveResult('error', err.message);
+    enableSaveButtons();
+  }
+}
+
+async function updateJob(id, data) {
+  disableSaveButtons();
+  const payload = {
+    role: data.role,
+    company: data.company,
+    applied_at: formatDate(new Date()),
+    applied: false,
+    status: 'saved',
+    url: data.url,
+    apply_url: data.apply_url || "",
+    job_type: data.jobType || "",
+    location: data.location || "",
+    description: data.description || "",
+    posted_at: data.posted_at || "",
+  };
+  try {
+    const result = await sendMessageToBackground({ action: 'updateVacancy', id, data: payload });
+    if (result.success) {
+      showSaveResult('success', 'Job updated ✓');
     } else {
       showSaveResult('error', result.error);
       enableSaveButtons();
@@ -155,6 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     if (dupResult && dupResult.isDuplicate) {
       showDuplicateWarning();
+      document.getElementById('btn-update').addEventListener('click', () => updateJob(dupResult.existingId, jobData.data));
     }
   } catch {
     // fail-open: ignore duplicate check errors
@@ -163,5 +195,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   showState('data-ready');
 
   document.getElementById('btn-save').addEventListener('click', () => saveJob(jobData.data));
-  document.getElementById('btn-save-anyway').addEventListener('click', () => saveJob(jobData.data));
 });

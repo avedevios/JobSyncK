@@ -13,6 +13,17 @@ function isDuplicateUrl(vacancies, url) {
 }
 
 /**
+ * Returns the id of the existing vacancy with matching url, or null.
+ * @param {Array<{url: string, id: number}>} vacancies
+ * @param {string} url
+ * @returns {number|null}
+ */
+function findDuplicateId(vacancies, url) {
+  const found = vacancies.find((v) => v.url === url);
+  return found ? found.id : null;
+}
+
+/**
  * Builds a VacancyPayload from parsed job data.
  * @param {{ role: string, company: string, url: string }} data
  * @returns {{ role: string, company: string, applied_at: string, applied: false, status: "saved", url: string }}
@@ -35,9 +46,9 @@ function buildPayload(data) {
 
 /**
  * Checks whether the given URL is already saved in the backend.
- * Fail-open: returns false on any error.
+ * Returns { isDuplicate, existingId } — fail-open on error.
  * @param {string} url
- * @returns {Promise<boolean>}
+ * @returns {Promise<{isDuplicate: boolean, existingId: number|null}>}
  */
 async function checkDuplicate(url) {
   try {
@@ -48,10 +59,10 @@ async function checkDuplicate(url) {
       throw new Error(`Backend error: ${response.status}`);
     }
     const vacancies = await response.json();
-    return isDuplicateUrl(vacancies, url);
+    const existingId = findDuplicateId(vacancies, url);
+    return { isDuplicate: existingId !== null, existingId };
   } catch {
-    // fail-open: never block saving due to duplicate check failure
-    return false;
+    return { isDuplicate: false, existingId: null };
   }
 }
 
@@ -88,17 +99,52 @@ async function saveVacancy(data) {
   }
 }
 
+/**
+ * Updates an existing vacancy via PATCH /vacancies/:id.
+ * @param {number} id
+ * @param {object} data - VacancyPayload
+ * @returns {Promise<{success: boolean, vacancy?: object, error?: string}>}
+ */
+async function updateVacancy(id, data) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/vacancies/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.ok) {
+      const vacancy = await response.json();
+      return { success: true, vacancy };
+    } else {
+      const body = await response.json();
+      return { success: false, error: body.error || "Unknown error" };
+    }
+  } catch (error) {
+    if (error.name === "TimeoutError" || error.name === "TypeError") {
+      return { success: false, error: BACKEND_UNAVAILABLE_MSG };
+    }
+    return { success: false, error: error.message };
+  }
+}
 // Message listener
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === "checkDuplicate") {
-    checkDuplicate(message.url).then((isDuplicate) => {
-      sendResponse({ isDuplicate });
+    checkDuplicate(message.url).then((result) => {
+      sendResponse(result);
     });
     return true;
   }
 
   if (message.action === "saveVacancy") {
     saveVacancy(message.data).then((result) => {
+      sendResponse(result);
+    });
+    return true;
+  }
+
+  if (message.action === "updateVacancy") {
+    updateVacancy(message.id, message.data).then((result) => {
       sendResponse(result);
     });
     return true;
