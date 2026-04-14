@@ -136,7 +136,9 @@ function getJobDescription() {
   for (const sel of selectors) {
     const el = document.querySelector(sel);
     if (el && el.textContent.trim() !== '') {
-      return (el.innerText || el.textContent).trim();
+      const text = (el.innerText || el.textContent).trim();
+      // Strip LinkedIn's "… more" truncation artifact
+      return text.replace(/\s*[…\.]{1,3}\s*more\s*$/i, '').trim();
     }
   }
   return '';

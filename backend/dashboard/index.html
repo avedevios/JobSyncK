@@ -55,6 +55,7 @@
     .stat-card.interviewing .num { color: #8b5cf6; }
     .stat-card.rejected .num { color: #ef4444; }
     .stat-card.offer .num { color: #10b981; }
+    .stat-card.archived .num { color: #9ca3af; }
 
     /* Filters */
     .filters {
@@ -105,14 +106,19 @@
     th .sort-icon { margin-left: 4px; opacity: 0.4; }
     th.sorted .sort-icon { opacity: 1; color: #0a66c2; }
 
-    td { padding: 11px 14px; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+    td { padding: 13px 14px; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+    .actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
     tr:hover td { background: #f8fbff; cursor: pointer; }
+    tr.remote-row td { background: #fff0f0; }
+    tr.remote-row:hover td { background: #ffd6d6; }
 
     .role-cell { font-weight: 500; max-width: 200px; }
     .company-cell { color: #444; }
     .location-cell { color: #666; font-size: 12px; }
     .url-cell a { color: #0a66c2; text-decoration: none; font-size: 12px; }
     .url-cell a:hover { text-decoration: underline; }
+    .desc-cell { width: 40px; text-align: center; }
+    .actions-cell { white-space: nowrap; width: 1%; }
 
     .badge {
       display: inline-block;
@@ -128,15 +134,17 @@
     .badge-interviewing { background: #ede9fe; color: #7c3aed; }
     .badge-rejected  { background: #fee2e2; color: #dc2626; }
     .badge-offer     { background: #d1fae5; color: #059669; }
+    .badge-archived  { background: #f3f4f6; color: #6b7280; }
 
     .actions { display: flex; gap: 6px; }
     .btn-icon {
       border: none;
       background: none;
       cursor: pointer;
-      padding: 5px 7px;
-      border-radius: 5px;
-      font-size: 14px;
+      padding: 6px 9px;
+      border-radius: 6px;
+      font-size: 18px;
+      line-height: 1;
       transition: background 0.15s;
     }
     .btn-icon:hover { background: #f0f0f0; }
@@ -277,6 +285,10 @@
       <div class="num" id="stat-rejected">—</div>
       <div class="label">Rejected</div>
     </div>
+    <div class="stat-card archived" data-status="archived">
+      <div class="num" id="stat-archived">—</div>
+      <div class="label">Archived</div>
+    </div>
   </div>
 
   <!-- Filters -->
@@ -291,6 +303,7 @@
       <option value="interviewing">Interviewing</option>
       <option value="offer">Offer</option>
       <option value="rejected">Rejected</option>
+      <option value="archived">Archived</option>
     </select>
     <label>Location:</label>
     <select id="filter-location">
@@ -312,6 +325,7 @@
           <th data-sort="apply_date">Apply Date <span class="sort-icon">↕</span></th>
           <th data-sort="screening_date">Screening <span class="sort-icon">↕</span></th>
           <th>Links</th>
+          <th>Desc</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -351,6 +365,7 @@
           <option value="interviewing">Interviewing</option>
           <option value="offer">Offer</option>
           <option value="rejected">Rejected</option>
+          <option value="archived">Archived</option>
         </select>
       </div>
       <div class="form-group">
@@ -395,6 +410,18 @@
       <div style="flex:1"></div>
       <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn btn-primary" id="modal-save">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Description Modal -->
+<div class="confirm-overlay" id="desc-overlay">
+  <div class="modal" style="max-width:680px">
+    <h2 id="desc-title" style="margin-bottom:16px"></h2>
+    <pre id="desc-body" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13px;line-height:1.6;max-height:60vh;overflow-y:auto;background:#f8f9fa;padding:16px;border-radius:8px;"></pre>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn btn-secondary" id="desc-copy">Copy</button>
+      <button class="btn btn-secondary" id="desc-close">Close</button>
     </div>
   </div>
 </div>
@@ -448,7 +475,7 @@ async function loadVacancies() {
 
 // ── Stats ──────────────────────────────────────────────
 function updateStats() {
-  const counts = { saved: 0, applied: 0, screening: 0, interviewing: 0, offer: 0, rejected: 0 };
+  const counts = { saved: 0, applied: 0, screening: 0, interviewing: 0, offer: 0, rejected: 0, archived: 0 };
   allVacancies.forEach(v => { if (counts[v.status] !== undefined) counts[v.status]++; });
   document.getElementById('stat-total').textContent = allVacancies.length;
   document.getElementById('stat-saved').textContent = counts.saved;
@@ -457,6 +484,7 @@ function updateStats() {
   document.getElementById('stat-interviewing').textContent = counts.interviewing;
   document.getElementById('stat-offer').textContent = counts.offer;
   document.getElementById('stat-rejected').textContent = counts.rejected;
+  document.getElementById('stat-archived').textContent = counts.archived;
 }
 
 // ── Location filter options ────────────────────────────
@@ -501,8 +529,10 @@ function renderTable() {
   }
   empty.classList.add('hidden');
 
-  tbody.innerHTML = rows.map(v => `
-    <tr onclick="openEdit(${v.id})">
+  tbody.innerHTML = rows.map(v => {
+    const isRemote = /remote/i.test(v.job_type || '') || /remote/i.test(v.location || '');
+    return `
+    <tr onclick="openEdit(${v.id})"${isRemote ? ' class="remote-row"' : ''}>
       <td class="role-cell">${esc(v.role)}</td>
       <td class="company-cell">${esc(v.company)}</td>
       <td class="location-cell">${esc(v.location || '—')}</td>
@@ -516,12 +546,19 @@ function renderTable() {
         ${v.url && v.apply_url ? ' · ' : ''}
         ${v.apply_url ? `<a href="${esc(v.apply_url)}" target="_blank">Apply ↗</a>` : ''}
       </td>
-      <td class="actions" onclick="event.stopPropagation()">
-        ${['saved','applied'].includes(v.status) ? `<button class="btn-icon apply" title="${v.status === 'applied' ? 'Undo Apply' : 'Mark as Applied'}" onclick="markApplied(${v.id}, ${v.status === 'applied'})">📨</button>` : ''}
-        ${['applied','screening'].includes(v.status) ? `<button class="btn-icon" title="Mark as Screening" onclick="openScreening(${v.id}, '${v.status}', '${v.apply_date || ''}')">📞</button>` : ''}
+      <td class="desc-cell" onclick="event.stopPropagation()">
+        ${v.description ? `<button class="btn-icon" title="View description" onclick="openDesc(${v.id})">📄</button>` : '—'}
+      </td>
+      <td class="actions-cell" onclick="event.stopPropagation()">
+        <div class="actions">
+          ${['saved','applied'].includes(v.status) ? `<button class="btn-icon apply" title="${v.status === 'applied' ? 'Undo Apply' : 'Mark as Applied'}" onclick="markApplied(${v.id}, ${v.status === 'applied'})">📨</button>` : ''}
+          ${['applied','screening'].includes(v.status) ? `<button class="btn-icon" title="Mark as Screening" onclick="openScreening(${v.id}, '${v.status}', '${v.apply_date || ''}')">📞</button>` : ''}
+          <button class="btn-icon" title="${v.status === 'archived' ? 'Unarchive' : 'Archive'}" onclick="toggleArchive(${v.id}, '${v.status}', '${v.apply_date || ''}', '${v.screening_date || ''}')">🗂️</button>
+        </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ── Stat card clicks ───────────────────────────────────
@@ -586,6 +623,59 @@ async function markApplied(id, undo = false) {
     });
     if (res.ok) {
       showToast(undo ? 'Reverted to Saved' : 'Marked as Applied ✓', 'success');
+      await loadVacancies();
+    } else {
+      showToast('Update failed', 'error');
+    }
+  } catch {
+    showToast('Could not connect to backend', 'error');
+  }
+}
+
+// ── Description ────────────────────────────────────────
+function openDesc(id) {
+  const v = allVacancies.find(x => x.id === id);
+  if (!v) return;
+  document.getElementById('desc-title').textContent = `${v.role} — ${v.company}`;
+  document.getElementById('desc-body').textContent = v.description || '';
+  document.getElementById('desc-overlay').classList.add('open');
+}
+
+document.getElementById('desc-copy').addEventListener('click', () => {
+  const text = document.getElementById('desc-body').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('desc-copy');
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+});
+
+document.getElementById('desc-close').addEventListener('click', () => {
+  document.getElementById('desc-overlay').classList.remove('open');
+});
+document.getElementById('desc-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+
+// ── Archive ────────────────────────────────────────────
+async function toggleArchive(id, currentStatus, applyDate, screeningDate) {
+  let newStatus;
+  if (currentStatus === 'archived') {
+    // Restore based on dates
+    if (screeningDate) newStatus = 'screening';
+    else if (applyDate) newStatus = 'applied';
+    else newStatus = 'saved';
+  } else {
+    newStatus = 'archived';
+  }
+  try {
+    const res = await fetch(`${API}/vacancies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (res.ok) {
+      showToast(currentStatus === 'archived' ? `Restored to ${newStatus}` : 'Archived', 'success');
       await loadVacancies();
     } else {
       showToast('Update failed', 'error');
@@ -759,6 +849,7 @@ window.addEventListener('keyup', e => {
     document.getElementById('modal-overlay').classList.remove('open');
     document.getElementById('confirm-overlay').classList.remove('open');
     document.getElementById('screening-overlay').classList.remove('open');
+    document.getElementById('desc-overlay').classList.remove('open');
   }
 });
 
