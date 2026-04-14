@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LinkedIn Job Saver</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- State: loading -->
+  <div id="state-loading" class="state">
+    <div class="spinner"></div>
+    <p>Loading...</p>
+  </div>
+
+  <!-- State: not a job page -->
+  <div id="state-not-job-page" class="state hidden">
+    <p class="info">Open a LinkedIn job listing to save it.</p>
+  </div>
+
+  <!-- State: data fetch error -->
+  <div id="state-data-error" class="state hidden">
+    <p id="data-error-message" class="error"></p>
+  </div>
+
+  <!-- State: data ready -->
+  <div id="state-data-ready" class="state hidden">
+    <div class="field">
+      <label>Role</label>
+      <span id="field-role"></span>
+    </div>
+    <div class="field">
+      <label>Company</label>
+      <span id="field-company"></span>
+    </div>
+    <div class="field">
+      <label>Job Type</label>
+      <span id="field-jobtype"></span>
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <span id="field-url" class="url-truncated"></span>
+    </div>
+
+    <!-- Duplicate warning -->
+    <div id="duplicate-warning" class="warning hidden">
+      ⚠️ This job is already saved.
+    </div>
+
+    <!-- Buttons -->
+    <button id="btn-save" class="btn-primary">Save Job</button>
+    <button id="btn-save-anyway" class="btn-secondary hidden">Save Again</button>
+
+    <!-- Save result -->
+    <p id="save-result" class="hidden"></p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

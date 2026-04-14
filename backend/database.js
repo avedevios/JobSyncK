@@ -28,9 +28,17 @@ async function getDb() {
       status TEXT NOT NULL DEFAULT 'saved',
       url TEXT DEFAULT '',
       notes TEXT DEFAULT '',
+      job_type TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
+
+  // Откат/миграция: добавляем колонку, если ее нет. sql.js выбрасывает ошибку, если колонка уже существует.
+  try {
+    db.run("ALTER TABLE vacancies ADD COLUMN job_type TEXT DEFAULT ''");
+  } catch (e) {
+    // Колонка уже существует, игнорируем
+  }
 
   save();
   return db;

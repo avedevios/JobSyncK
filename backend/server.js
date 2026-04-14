@@ -31,7 +31,7 @@ app.get('/vacancies/:id', async (req, res) => {
 
 // POST /vacancies — добавить вакансию
 app.post('/vacancies', async (req, res) => {
-  const { role, company, applied_at, applied = 0, status = 'saved', url = '', notes = '' } = req.body;
+  const { role, company, applied_at, applied = 0, status = 'saved', url = '', notes = '', job_type = '' } = req.body;
 
   if (!role || !company || !applied_at) {
     return res.status(400).json({ error: 'role, company и applied_at обязательны' });
@@ -39,8 +39,8 @@ app.post('/vacancies', async (req, res) => {
 
   const db = await getDb();
   db.run(
-    'INSERT INTO vacancies (role, company, applied_at, applied, status, url, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [role, company, applied_at, applied ? 1 : 0, status, url, notes]
+    'INSERT INTO vacancies (role, company, applied_at, applied, status, url, notes, job_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [role, company, applied_at, applied ? 1 : 0, status, url, notes, job_type]
   );
   save();
 
@@ -58,7 +58,7 @@ app.patch('/vacancies/:id', async (req, res) => {
   const { columns, values } = existing[0];
   const vacancy = Object.fromEntries(columns.map((col, i) => [col, values[0][i]]));
 
-  const { role, company, applied_at, applied, status, url, notes } = req.body;
+  const { role, company, applied_at, applied, status, url, notes, job_type } = req.body;
   const updated = {
     role: role ?? vacancy.role,
     company: company ?? vacancy.company,
@@ -67,11 +67,12 @@ app.patch('/vacancies/:id', async (req, res) => {
     status: status ?? vacancy.status,
     url: url ?? vacancy.url,
     notes: notes ?? vacancy.notes,
+    job_type: job_type ?? vacancy.job_type,
   };
 
   db.run(
-    'UPDATE vacancies SET role=?, company=?, applied_at=?, applied=?, status=?, url=?, notes=? WHERE id=?',
-    [updated.role, updated.company, updated.applied_at, updated.applied, updated.status, updated.url, updated.notes, req.params.id]
+    'UPDATE vacancies SET role=?, company=?, applied_at=?, applied=?, status=?, url=?, notes=?, job_type=? WHERE id=?',
+    [updated.role, updated.company, updated.applied_at, updated.applied, updated.status, updated.url, updated.notes, updated.job_type, req.params.id]
   );
   save();
 

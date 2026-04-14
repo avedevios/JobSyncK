@@ -1,5 +1,6 @@
 # Dependencies
 backend/node_modules/
+safari-extension/node_modules/
 
 # Database
 backend/jobs.db
@@ -9,3 +10,11 @@ backend/jobs.db
 
 # Logs
 npm-debug.log*
+
+# Xcode
+safari-extension/LinkedInJobSaver.xcodeproj/xcuserdata/
+safari-extension/LinkedInJobSaver.xcodeproj/project.xcworkspace/xcuserdata/
+safari-extension/build/
+
+# Test/Source files
+linkedin_source.html

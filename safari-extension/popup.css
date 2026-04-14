@@ -1,0 +1,128 @@
+body {
+  width: 320px;
+  min-height: 120px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  margin: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.state {
+  display: block;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #0a66c2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 10px;
+  background: #0a66c2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.btn-primary:hover {
+  background: #004182;
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 8px;
+  background: #f3f2f1;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.error {
+  color: #d32f2f;
+  font-size: 13px;
+}
+
+.success {
+  color: #2e7d32;
+  font-size: 13px;
+}
+
+.url-truncated {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+  display: block;
+  font-size: 12px;
+  color: #666;
+}
+
+.field {
+  margin-bottom: 10px;
+}
+
+.field label {
+  font-weight: 600;
+  display: block;
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.field span {
+  font-size: 14px;
+  color: #1d1d1d;
+}
+
+#save-result {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+p.info {
+  color: #555;
+  font-size: 14px;
+  text-align: center;
+  padding: 8px 0;
+}
