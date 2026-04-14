@@ -18,3 +18,7 @@ safari-extension/build/
 
 # Test/Source files
 linkedin_source.html
+
+# IDE
+.vscode/
+.kiro/
