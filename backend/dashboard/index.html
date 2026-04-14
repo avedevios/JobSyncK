@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobSyncK Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f5f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #0a66c2;
+      color: white;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 20px; font-weight: 600; }
+    header span { font-size: 13px; opacity: 0.8; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+
+    /* Stats */
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 16px 24px;
+      flex: 1;
+      min-width: 120px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      text-align: center;
+      cursor: pointer;
+      transition: box-shadow 0.15s, transform 0.15s;
+      user-select: none;
+    }
+    .stat-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.13); transform: translateY(-1px); }
+    .stat-card.active { box-shadow: 0 0 0 2px #0a66c2; }
+    .stat-card .num { font-size: 28px; font-weight: 700; color: #0a66c2; }
+    .stat-card .label { font-size: 12px; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card.applied .num { color: #f59e0b; }
+    .stat-card.screening .num { color: #06b6d4; }
+    .stat-card.interviewing .num { color: #8b5cf6; }
+    .stat-card.rejected .num { color: #ef4444; }
+    .stat-card.offer .num { color: #10b981; }
+
+    /* Filters */
+    .filters {
+      background: white;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filters input, .filters select {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .filters input:focus, .filters select:focus { border-color: #0a66c2; }
+    .filters input { flex: 1; min-width: 180px; }
+    .filters label { font-size: 13px; color: #555; white-space: nowrap; }
+
+    /* Table */
+    .table-wrap {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: #f8f9fa; }
+    th {
+      padding: 12px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: #555;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover { color: #0a66c2; }
+    th .sort-icon { margin-left: 4px; opacity: 0.4; }
+    th.sorted .sort-icon { opacity: 1; color: #0a66c2; }
+
+    td { padding: 11px 14px; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:hover td { background: #f8fbff; cursor: pointer; }
+
+    .role-cell { font-weight: 500; max-width: 200px; }
+    .company-cell { color: #444; }
+    .location-cell { color: #666; font-size: 12px; }
+    .url-cell a { color: #0a66c2; text-decoration: none; font-size: 12px; }
+    .url-cell a:hover { text-decoration: underline; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-saved     { background: #e0f0ff; color: #0a66c2; }
+    .badge-applied   { background: #fef3c7; color: #d97706; }
+    .badge-screening { background: #cffafe; color: #0891b2; }
+    .badge-interviewing { background: #ede9fe; color: #7c3aed; }
+    .badge-rejected  { background: #fee2e2; color: #dc2626; }
+    .badge-offer     { background: #d1fae5; color: #059669; }
+
+    .actions { display: flex; gap: 6px; }
+    .btn-icon {
+      border: none;
+      background: none;
+      cursor: pointer;
+      padding: 5px 7px;
+      border-radius: 5px;
+      font-size: 14px;
+      transition: background 0.15s;
+    }
+    .btn-icon:hover { background: #f0f0f0; }
+    .btn-icon.apply:hover { background: #d1fae5; }
+    .btn-icon.delete:hover { background: #fee2e2; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 12px;
+      padding: 28px;
+      width: 560px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .modal h2 { font-size: 17px; margin-bottom: 20px; color: #1a1a2e; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.4px; }
+    .form-group input, .form-group select, .form-group textarea {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #0a66c2; }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn { padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #0a66c2; color: white; }
+    .btn-secondary { background: #f0f0f0; color: #333; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger-text { background: none; color: #ef4444; border: 1px solid #ef4444; }
+    .btn-danger-text:hover { background: #fee2e2; opacity: 1; }
+
+    /* Confirm dialog */
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .confirm-overlay.open { display: flex; }
+    .confirm-box {
+      background: white;
+      border-radius: 10px;
+      padding: 24px;
+      width: 340px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      text-align: center;
+    }
+    .confirm-box p { margin-bottom: 20px; font-size: 14px; color: #333; }
+    .confirm-box .actions { display: flex; gap: 10px; justify-content: center; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1a1a2e;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s;
+      z-index: 300;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #059669; }
+    .toast.error { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>JobSyncK</h1>
+  <span>Job Application Tracker</span>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card" data-status="">
+      <div class="num" id="stat-total">—</div>
+      <div class="label">Total</div>
+    </div>
+    <div class="stat-card" data-status="saved">
+      <div class="num" id="stat-saved">—</div>
+      <div class="label">Saved</div>
+    </div>
+    <div class="stat-card applied" data-status="applied">
+      <div class="num" id="stat-applied">—</div>
+      <div class="label">Applied</div>
+    </div>
+    <div class="stat-card screening" data-status="screening">
+      <div class="num" id="stat-screening">—</div>
+      <div class="label">Screening</div>
+    </div>
+    <div class="stat-card interviewing" data-status="interviewing">
+      <div class="num" id="stat-interviewing">—</div>
+      <div class="label">Interviewing</div>
+    </div>
+    <div class="stat-card offer" data-status="offer">
+      <div class="num" id="stat-offer">—</div>
+      <div class="label">Offer</div>
+    </div>
+    <div class="stat-card rejected" data-status="rejected">
+      <div class="num" id="stat-rejected">—</div>
+      <div class="label">Rejected</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <input type="text" id="filter-search" placeholder="Search role or company…">
+    <label>Status:</label>
+    <select id="filter-status">
+      <option value="">All</option>
+      <option value="saved">Saved</option>
+      <option value="applied">Applied</option>
+      <option value="screening">Screening</option>
+      <option value="interviewing">Interviewing</option>
+      <option value="offer">Offer</option>
+      <option value="rejected">Rejected</option>
+    </select>
+    <label>Location:</label>
+    <select id="filter-location">
+      <option value="">All</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="role">Role <span class="sort-icon">↕</span></th>
+          <th data-sort="company">Company <span class="sort-icon">↕</span></th>
+          <th data-sort="location">Location <span class="sort-icon">↕</span></th>
+          <th data-sort="job_type">Type <span class="sort-icon">↕</span></th>
+          <th data-sort="status">Status <span class="sort-icon">↕</span></th>
+          <th data-sort="applied_at">Posted At <span class="sort-icon">↕</span></th>
+          <th data-sort="apply_date">Apply Date <span class="sort-icon">↕</span></th>
+          <th data-sort="screening_date">Screening <span class="sort-icon">↕</span></th>
+          <th>Links</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div class="empty-state hidden" id="empty-state">
+      <div class="icon">📋</div>
+      <p>No vacancies found</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>Edit Vacancy</h2>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>LinkedIn Job ID</label>
+        <input type="text" id="edit-linkedin-job-id" readonly style="background:#f8f9fa;color:#888;cursor:default;">
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <input type="text" id="edit-role">
+      </div>
+      <div class="form-group">
+        <label>Company</label>
+        <input type="text" id="edit-company">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="edit-status">
+          <option value="saved">Saved</option>
+          <option value="applied">Applied</option>
+          <option value="screening">Screening</option>
+          <option value="interviewing">Interviewing</option>
+          <option value="offer">Offer</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Job Type</label>
+        <input type="text" id="edit-job-type">
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" id="edit-location">
+      </div>
+      <div class="form-group">
+        <label>Posted At</label>
+        <input type="date" id="edit-applied-at">
+      </div>
+      <div class="form-group full">
+        <label>Share URL</label>
+        <input type="text" id="edit-url">
+      </div>
+      <div class="form-group full">
+        <label>Apply URL</label>
+        <input type="text" id="edit-apply-url">
+      </div>
+      <div class="form-group full">
+        <label>Notes</label>
+        <textarea id="edit-notes"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Apply Date</label>
+        <input type="date" id="edit-apply-date">
+      </div>
+      <div class="form-group">
+        <label>Screening Date</label>
+        <input type="date" id="edit-screening-date">
+      </div>
+      <div class="form-group full">
+        <label>Interview Dates <span style="font-weight:400;text-transform:none;font-size:11px;color:#888">(one per line)</span></label>
+        <textarea id="edit-interview-dates" placeholder="2026-04-20&#10;2026-04-27"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger-text" id="modal-delete">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-save">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <p>Delete this vacancy?</p>
+    <div class="actions">
+      <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" id="confirm-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Screening Date Picker -->
+<div class="confirm-overlay" id="screening-overlay">
+  <div class="confirm-box">
+    <p style="margin-bottom:12px">Screening date</p>
+    <input type="date" id="screening-date-input" style="border:1px solid #ddd;border-radius:6px;padding:7px 12px;font-size:14px;width:100%;margin-bottom:16px;outline:none;">
+    <div class="actions">
+      <button class="btn btn-secondary" id="screening-cancel">Cancel</button>
+      <button class="btn btn-primary" id="screening-confirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:3333';
+let allVacancies = [];
+let sortKey = 'applied_at';
+let sortDir = -1; // -1 = desc
+let editingId = null;
+let deletingId = null;
+
+// ── Fetch ──────────────────────────────────────────────
+async function loadVacancies() {
+  try {
+    const res = await fetch(`${API}/vacancies`);
+    allVacancies = await res.json();
+    updateStats();
+    updateLocationFilter();
+    renderTable();
+  } catch (e) {
+    showToast('Could not connect to backend', 'error');
+  }
+}
+
+// ── Stats ──────────────────────────────────────────────
+function updateStats() {
+  const counts = { saved: 0, applied: 0, screening: 0, interviewing: 0, offer: 0, rejected: 0 };
+  allVacancies.forEach(v => { if (counts[v.status] !== undefined) counts[v.status]++; });
+  document.getElementById('stat-total').textContent = allVacancies.length;
+  document.getElementById('stat-saved').textContent = counts.saved;
+  document.getElementById('stat-applied').textContent = counts.applied;
+  document.getElementById('stat-screening').textContent = counts.screening;
+  document.getElementById('stat-interviewing').textContent = counts.interviewing;
+  document.getElementById('stat-offer').textContent = counts.offer;
+  document.getElementById('stat-rejected').textContent = counts.rejected;
+}
+
+// ── Location filter options ────────────────────────────
+function updateLocationFilter() {
+  const sel = document.getElementById('filter-location');
+  const current = sel.value;
+  const locations = [...new Set(allVacancies.map(v => v.location).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All</option>' +
+    locations.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  sel.value = current;
+}
+
+// ── Render ─────────────────────────────────────────────
+function getFiltered() {
+  const search = document.getElementById('filter-search').value.toLowerCase();
+  const status = document.getElementById('filter-status').value;
+  const location = document.getElementById('filter-location').value;
+
+  return allVacancies
+    .filter(v => {
+      if (search && !v.role.toLowerCase().includes(search) && !v.company.toLowerCase().includes(search)) return false;
+      if (status && v.status !== status) return false;
+      if (location && v.location !== location) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const av = (a[sortKey] || '').toString().toLowerCase();
+      const bv = (b[sortKey] || '').toString().toLowerCase();
+      return av < bv ? sortDir : av > bv ? -sortDir : 0;
+    });
+}
+
+function renderTable() {
+  const rows = getFiltered();
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  tbody.innerHTML = rows.map(v => `
+    <tr onclick="openEdit(${v.id})">
+      <td class="role-cell">${esc(v.role)}</td>
+      <td class="company-cell">${esc(v.company)}</td>
+      <td class="location-cell">${esc(v.location || '—')}</td>
+      <td>${esc(v.job_type || '—')}</td>
+      <td><span class="badge badge-${v.status}">${v.status}</span></td>
+      <td>${esc(v.applied_at || '—')}</td>
+      <td>${esc(v.apply_date || '—')}</td>
+      <td>${esc(v.screening_date || '—')}</td>
+      <td class="url-cell" onclick="event.stopPropagation()">
+        ${v.url ? `<a href="${esc(v.url)}" target="_blank">Job ↗</a>` : ''}
+        ${v.url && v.apply_url ? ' · ' : ''}
+        ${v.apply_url ? `<a href="${esc(v.apply_url)}" target="_blank">Apply ↗</a>` : ''}
+      </td>
+      <td class="actions" onclick="event.stopPropagation()">
+        ${['saved','applied'].includes(v.status) ? `<button class="btn-icon apply" title="${v.status === 'applied' ? 'Undo Apply' : 'Mark as Applied'}" onclick="markApplied(${v.id}, ${v.status === 'applied'})">📨</button>` : ''}
+        ${['applied','screening'].includes(v.status) ? `<button class="btn-icon" title="Mark as Screening" onclick="openScreening(${v.id}, '${v.status}', '${v.apply_date || ''}')">📞</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── Stat card clicks ───────────────────────────────────
+document.querySelectorAll('.stat-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const status = card.dataset.status;
+    const filterSel = document.getElementById('filter-status');
+    const isActive = card.classList.contains('active');
+
+    // deactivate all cards
+    document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+
+    if (isActive) {
+      // toggle off — reset filter
+      filterSel.value = '';
+    } else {
+      card.classList.add('active');
+      filterSel.value = status;
+    }
+    renderTable();
+  });
+});
+
+// ── Sort ───────────────────────────────────────────────
+document.querySelectorAll('th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = 1; }
+    document.querySelectorAll('th[data-sort]').forEach(t => t.classList.remove('sorted'));
+    th.classList.add('sorted');
+    th.querySelector('.sort-icon').textContent = sortDir === 1 ? '↑' : '↓';
+    renderTable();
+  });
+});
+
+// ── Filters ────────────────────────────────────────────
+['filter-search', 'filter-status', 'filter-location'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    if (id === 'filter-status') {
+      document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+      const val = document.getElementById('filter-status').value;
+      if (val) {
+        const card = document.querySelector(`.stat-card[data-status="${val}"]`);
+        if (card) card.classList.add('active');
+      }
+    }
+    renderTable();
+  });
+});
+
+// ── Mark Applied ───────────────────────────────────────
+async function markApplied(id, undo = false) {
+  const payload = undo
+    ? { status: 'saved', apply_date: '' }
+    : { status: 'applied', apply_date: new Date().toISOString().split('T')[0] };
+  try {
+    const res = await fetch(`${API}/vacancies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      showToast(undo ? 'Reverted to Saved' : 'Marked as Applied ✓', 'success');
+      await loadVacancies();
+    } else {
+      showToast('Update failed', 'error');
+    }
+  } catch {
+    showToast('Could not connect to backend', 'error');
+  }
+}
+
+// ── Screening ──────────────────────────────────────────
+let screeningId = null;
+
+function openScreening(id, currentStatus, applyDate) {
+  // Undo screening
+  if (currentStatus === 'screening') {
+    const revertStatus = applyDate ? 'applied' : 'saved';
+    fetch(`${API}/vacancies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: revertStatus, screening_date: '' }),
+    })
+      .then(res => {
+        if (res.ok) {
+          showToast(`Reverted to ${revertStatus}`, 'success');
+          loadVacancies();
+        } else {
+          showToast('Update failed', 'error');
+        }
+      })
+      .catch(() => showToast('Could not connect to backend', 'error'));
+    return;
+  }
+
+  // Set screening
+  screeningId = id;
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('screening-date-input').value = today;
+  document.getElementById('screening-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('screening-date-input').focus(), 50);
+}
+
+document.getElementById('screening-cancel').addEventListener('click', () => {
+  document.getElementById('screening-overlay').classList.remove('open');
+});
+
+document.getElementById('screening-confirm').addEventListener('click', async () => {
+  const date = document.getElementById('screening-date-input').value;
+  document.getElementById('screening-overlay').classList.remove('open');
+  try {
+    const res = await fetch(`${API}/vacancies/${screeningId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'screening', screening_date: date }),
+    });
+    if (res.ok) {
+      showToast('Screening scheduled ✓', 'success');
+      await loadVacancies();
+    } else {
+      showToast('Update failed', 'error');
+    }
+  } catch {
+    showToast('Could not connect to backend', 'error');
+  }
+});
+
+// ── Edit Modal ─────────────────────────────────────────
+function openEdit(id) {
+  const v = allVacancies.find(x => x.id === id);
+  if (!v) return;
+  editingId = id;
+  document.getElementById('edit-linkedin-job-id').value = v.linkedin_job_id || '—';
+  document.getElementById('edit-role').value = v.role || '';
+  document.getElementById('edit-company').value = v.company || '';
+  document.getElementById('edit-status').value = v.status || 'saved';
+  document.getElementById('edit-job-type').value = v.job_type || '';
+  document.getElementById('edit-location').value = v.location || '';
+  document.getElementById('edit-applied-at').value = v.applied_at || '';
+  document.getElementById('edit-url').value = v.url || '';
+  document.getElementById('edit-apply-url').value = v.apply_url || '';
+  document.getElementById('edit-notes').value = v.notes || '';
+  document.getElementById('edit-apply-date').value = v.apply_date || '';
+  document.getElementById('edit-screening-date').value = v.screening_date || '';
+  // interview_dates stored as JSON array, show one per line
+  let dates = [];
+  try { dates = JSON.parse(v.interview_dates || '[]'); } catch {}
+  document.getElementById('edit-interview-dates').value = dates.join('\n');
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+document.getElementById('modal-delete').addEventListener('click', () => {
+  openDelete(editingId);
+});
+
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+});
+
+document.getElementById('modal-save').addEventListener('click', async () => {
+  const payload = {
+    role: document.getElementById('edit-role').value,
+    company: document.getElementById('edit-company').value,
+    status: document.getElementById('edit-status').value,
+    job_type: document.getElementById('edit-job-type').value,
+    location: document.getElementById('edit-location').value,
+    applied_at: document.getElementById('edit-applied-at').value,
+    url: document.getElementById('edit-url').value,
+    apply_url: document.getElementById('edit-apply-url').value,
+    notes: document.getElementById('edit-notes').value,
+    apply_date: document.getElementById('edit-apply-date').value,
+    screening_date: document.getElementById('edit-screening-date').value,
+    interview_dates: JSON.stringify(
+      document.getElementById('edit-interview-dates').value
+        .split('\n').map(s => s.trim()).filter(Boolean)
+    ),
+  };
+  try {
+    const res = await fetch(`${API}/vacancies/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      document.getElementById('modal-overlay').classList.remove('open');
+      showToast('Saved ✓', 'success');
+      await loadVacancies();
+    } else {
+      showToast('Save failed', 'error');
+    }
+  } catch {
+    showToast('Could not connect to backend', 'error');
+  }
+});
+
+// ── Delete ─────────────────────────────────────────────
+function openDelete(id) {
+  deletingId = id;
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+  document.getElementById('confirm-overlay').classList.remove('open');
+});
+
+document.getElementById('confirm-delete').addEventListener('click', async () => {
+  try {
+    const res = await fetch(`${API}/vacancies/${deletingId}`, { method: 'DELETE' });
+    if (res.ok) {
+      document.getElementById('confirm-overlay').classList.remove('open');
+      document.getElementById('modal-overlay').classList.remove('open');
+      showToast('Deleted', 'success');
+      await loadVacancies();
+    } else {
+      showToast('Delete failed', 'error');
+    }
+  } catch {
+    showToast('Could not connect to backend', 'error');
+  }
+});
+
+// Close modals on overlay click
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+document.getElementById('confirm-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+
+// Close modal on Escape
+window.addEventListener('keyup', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.getElementById('confirm-overlay').classList.remove('open');
+    document.getElementById('screening-overlay').classList.remove('open');
+  }
+});
+
+// ── Toast ──────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Helpers ────────────────────────────────────────────
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ───────────────────────────────────────────────
+loadVacancies();
+</script>
+</body>
+</html>

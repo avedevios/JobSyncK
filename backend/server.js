@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { getDb, save } = require('./database');
 
 const app = express();
@@ -7,6 +8,7 @@ const PORT = 3333;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'dashboard')));
 
 // GET /vacancies — получить все вакансии
 app.get('/vacancies', async (req, res) => {
@@ -31,7 +33,7 @@ app.get('/vacancies/:id', async (req, res) => {
 
 // POST /vacancies — добавить вакансию
 app.post('/vacancies', async (req, res) => {
-  const { role, company, applied_at, applied = 0, status = 'saved', url = '', notes = '', job_type = '', apply_url = '', description = '', posted_at = '', location = '' } = req.body;
+  const { role, company, applied_at, applied = 0, status = 'saved', url = '', notes = '', job_type = '', apply_url = '', linkedin_job_id = '', description = '', posted_at = '', location = '', apply_date = '', screening_date = '', interview_dates = '[]' } = req.body;
 
   if (!role || !company || !applied_at) {
     return res.status(400).json({ error: 'role, company и applied_at обязательны' });
@@ -39,8 +41,8 @@ app.post('/vacancies', async (req, res) => {
 
   const db = await getDb();
   db.run(
-    'INSERT INTO vacancies (role, company, applied_at, applied, status, url, notes, job_type, apply_url, description, posted_at, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [role, company, applied_at, applied ? 1 : 0, status, url, notes, job_type, apply_url, description, posted_at, location]
+    'INSERT INTO vacancies (role, company, applied_at, applied, status, url, notes, job_type, apply_url, linkedin_job_id, description, posted_at, location, apply_date, screening_date, interview_dates) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [role, company, applied_at, applied ? 1 : 0, status, url, notes, job_type, apply_url, linkedin_job_id, description, posted_at, location, apply_date, screening_date, interview_dates]
   );
   save();
 
@@ -58,7 +60,7 @@ app.patch('/vacancies/:id', async (req, res) => {
   const { columns, values } = existing[0];
   const vacancy = Object.fromEntries(columns.map((col, i) => [col, values[0][i]]));
 
-  const { role, company, applied_at, applied, status, url, notes, job_type, apply_url, description, posted_at, location } = req.body;
+  const { role, company, applied_at, applied, status, url, notes, job_type, apply_url, linkedin_job_id, description, posted_at, location, apply_date, screening_date, interview_dates } = req.body;
   const updated = {
     role: role ?? vacancy.role,
     company: company ?? vacancy.company,
@@ -69,14 +71,18 @@ app.patch('/vacancies/:id', async (req, res) => {
     notes: notes ?? vacancy.notes,
     job_type: job_type ?? vacancy.job_type,
     apply_url: apply_url ?? vacancy.apply_url,
+    linkedin_job_id: linkedin_job_id ?? vacancy.linkedin_job_id,
     description: description ?? vacancy.description,
     posted_at: posted_at ?? vacancy.posted_at,
     location: location ?? vacancy.location,
+    apply_date: apply_date ?? vacancy.apply_date,
+    screening_date: screening_date ?? vacancy.screening_date,
+    interview_dates: interview_dates ?? vacancy.interview_dates,
   };
 
   db.run(
-    'UPDATE vacancies SET role=?, company=?, applied_at=?, applied=?, status=?, url=?, notes=?, job_type=?, apply_url=?, description=?, posted_at=?, location=? WHERE id=?',
-    [updated.role, updated.company, updated.applied_at, updated.applied, updated.status, updated.url, updated.notes, updated.job_type, updated.apply_url, updated.description, updated.posted_at, updated.location, req.params.id]
+    'UPDATE vacancies SET role=?, company=?, applied_at=?, applied=?, status=?, url=?, notes=?, job_type=?, apply_url=?, linkedin_job_id=?, description=?, posted_at=?, location=?, apply_date=?, screening_date=?, interview_dates=? WHERE id=?',
+    [updated.role, updated.company, updated.applied_at, updated.applied, updated.status, updated.url, updated.notes, updated.job_type, updated.apply_url, updated.linkedin_job_id, updated.description, updated.posted_at, updated.location, updated.apply_date, updated.screening_date, updated.interview_dates, req.params.id]
   );
   save();
 

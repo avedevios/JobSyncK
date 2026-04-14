@@ -13,6 +13,7 @@ function showState(stateId) {
 }
 
 function fillFields(data) {
+  document.getElementById('field-job-id').textContent = data.linkedin_job_id || '—';
   document.getElementById('field-role').textContent = data.role;
   document.getElementById('field-company').textContent = data.company;
   document.getElementById('field-jobtype').textContent = data.jobType || '';
@@ -81,6 +82,7 @@ async function saveJob(data) {
     applied: false,
     status: 'saved',
     url: data.url,
+    linkedin_job_id: data.linkedin_job_id || "",
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
     location: data.location || "",
@@ -90,7 +92,7 @@ async function saveJob(data) {
   try {
     const result = await sendMessageToBackground({ action: 'saveVacancy', data: payload });
     if (result.success) {
-      showSaveResult('success', 'Job saved ✓');
+      window.close();
     } else {
       showSaveResult('error', result.error);
       enableSaveButtons();
@@ -110,6 +112,7 @@ async function updateJob(id, data) {
     applied: false,
     status: 'saved',
     url: data.url,
+    linkedin_job_id: data.linkedin_job_id || "",
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
     location: data.location || "",
@@ -119,7 +122,7 @@ async function updateJob(id, data) {
   try {
     const result = await sendMessageToBackground({ action: 'updateVacancy', id, data: payload });
     if (result.success) {
-      showSaveResult('success', 'Job updated ✓');
+      window.close();
     } else {
       showSaveResult('error', result.error);
       enableSaveButtons();
@@ -182,6 +185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const dupResult = await sendMessageToBackground({
       action: 'checkDuplicate',
+      linkedinJobId: jobData.data.linkedin_job_id,
       url: jobData.data.url,
     });
     if (dupResult && dupResult.isDuplicate) {

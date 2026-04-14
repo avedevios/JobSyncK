@@ -13,12 +13,18 @@ function isDuplicateUrl(vacancies, url) {
 }
 
 /**
- * Returns the id of the existing vacancy with matching url, or null.
- * @param {Array<{url: string, id: number}>} vacancies
+ * Returns the id of the existing vacancy with matching linkedin_job_id, or null.
+ * Falls back to url match if linkedin_job_id is empty.
+ * @param {Array<{url: string, linkedin_job_id: string, id: number}>} vacancies
+ * @param {string} linkedinJobId
  * @param {string} url
  * @returns {number|null}
  */
-function findDuplicateId(vacancies, url) {
+function findDuplicateId(vacancies, linkedinJobId, url) {
+  if (linkedinJobId) {
+    const found = vacancies.find((v) => v.linkedin_job_id === linkedinJobId);
+    if (found) return found.id;
+  }
   const found = vacancies.find((v) => v.url === url);
   return found ? found.id : null;
 }
@@ -36,6 +42,7 @@ function buildPayload(data) {
     applied: false,
     status: "saved",
     url: data.url,
+    linkedin_job_id: data.linkedin_job_id || "",
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
     location: data.location || "",
@@ -45,12 +52,13 @@ function buildPayload(data) {
 }
 
 /**
- * Checks whether the given URL is already saved in the backend.
+ * Checks whether the given job is already saved in the backend.
  * Returns { isDuplicate, existingId } — fail-open on error.
+ * @param {string} linkedinJobId
  * @param {string} url
  * @returns {Promise<{isDuplicate: boolean, existingId: number|null}>}
  */
-async function checkDuplicate(url) {
+async function checkDuplicate(linkedinJobId, url) {
   try {
     const response = await fetch(`${BACKEND_URL}/vacancies`, {
       signal: AbortSignal.timeout(5000),
@@ -59,7 +67,7 @@ async function checkDuplicate(url) {
       throw new Error(`Backend error: ${response.status}`);
     }
     const vacancies = await response.json();
-    const existingId = findDuplicateId(vacancies, url);
+    const existingId = findDuplicateId(vacancies, linkedinJobId, url);
     return { isDuplicate: existingId !== null, existingId };
   } catch {
     return { isDuplicate: false, existingId: null };
@@ -129,24 +137,93 @@ async function updateVacancy(id, data) {
 }
 // Message listener
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.action === "urlChanged") {
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      if (tab) updateBadge(tab.id, message.url);
+    });
+    return false;
+  }
+
   if (message.action === "checkDuplicate") {
-    checkDuplicate(message.url).then((result) => {
+    checkDuplicate(message.linkedinJobId, message.url).then((result) => {
       sendResponse(result);
     });
     return true;
   }
 
   if (message.action === "saveVacancy") {
-    saveVacancy(message.data).then((result) => {
+    saveVacancy(message.data).then(async (result) => {
+      if (result.success) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) updateBadge(tab.id, tab.url);
+      }
       sendResponse(result);
     });
     return true;
   }
 
   if (message.action === "updateVacancy") {
-    updateVacancy(message.id, message.data).then((result) => {
+    updateVacancy(message.id, message.data).then(async (result) => {
+      if (result.success) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) updateBadge(tab.id, tab.url);
+      }
       sendResponse(result);
     });
     return true;
   }
+});
+
+// ── Tab badge ──────────────────────────────────────────
+const JOB_PAGE_RE = /linkedin\.com\/jobs\/(view\/|search-results\/.*[?&]currentJobId=)/;
+
+function extractJobIdFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const fromParam = u.searchParams.get('currentJobId');
+    if (fromParam) return fromParam;
+    const match = u.pathname.match(/\/jobs\/view\/(\d+)/);
+    return match ? match[1] : '';
+  } catch {
+    return '';
+  }
+}
+
+async function updateBadge(tabId, url) {
+  if (!JOB_PAGE_RE.test(url)) {
+    chrome.action.setBadgeText({ text: '', tabId });
+    return;
+  }
+
+  const jobId = extractJobIdFromUrl(url);
+  try {
+    const response = await fetch(`${BACKEND_URL}/vacancies`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return;
+    const vacancies = await response.json();
+    const exists = jobId
+      ? vacancies.some((v) => v.linkedin_job_id === jobId)
+      : vacancies.some((v) => v.url === url);
+
+    if (exists) {
+      chrome.action.setBadgeText({ text: '✓', tabId });
+      chrome.action.setBadgeBackgroundColor({ color: '#059669', tabId });
+    } else {
+      chrome.action.setBadgeText({ text: '', tabId });
+    }
+  } catch {
+    chrome.action.setBadgeText({ text: '', tabId });
+  }
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    updateBadge(tabId, tab.url);
+  }
+});
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  const tab = await chrome.tabs.get(tabId);
+  if (tab.url) updateBadge(tabId, tab.url);
 });

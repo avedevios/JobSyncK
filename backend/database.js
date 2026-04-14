@@ -30,9 +30,13 @@ async function getDb() {
       notes TEXT DEFAULT '',
       job_type TEXT DEFAULT '',
       apply_url TEXT DEFAULT '',
+      linkedin_job_id TEXT DEFAULT '',
       description TEXT DEFAULT '',
       posted_at TEXT DEFAULT '',
       location TEXT DEFAULT '',
+      apply_date TEXT DEFAULT '',
+      screening_date TEXT DEFAULT '',
+      interview_dates TEXT DEFAULT '[]',
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -40,9 +44,13 @@ async function getDb() {
   // Откат/миграция: добавляем колонку, если ее нет. sql.js выбрасывает ошибку, если колонка уже существует.
   try { db.run("ALTER TABLE vacancies ADD COLUMN job_type TEXT DEFAULT ''"); } catch (e) {}
   try { db.run("ALTER TABLE vacancies ADD COLUMN apply_url TEXT DEFAULT ''"); } catch (e) {}
+  try { db.run("ALTER TABLE vacancies ADD COLUMN linkedin_job_id TEXT DEFAULT ''"); } catch (e) {}
   try { db.run("ALTER TABLE vacancies ADD COLUMN description TEXT DEFAULT ''"); } catch (e) {}
   try { db.run("ALTER TABLE vacancies ADD COLUMN posted_at TEXT DEFAULT ''"); } catch (e) {}
   try { db.run("ALTER TABLE vacancies ADD COLUMN location TEXT DEFAULT ''"); } catch (e) {}
+  try { db.run("ALTER TABLE vacancies ADD COLUMN apply_date TEXT DEFAULT ''"); } catch (e) {}
+  try { db.run("ALTER TABLE vacancies ADD COLUMN screening_date TEXT DEFAULT ''"); } catch (e) {}
+  try { db.run("ALTER TABLE vacancies ADD COLUMN interview_dates TEXT DEFAULT '[]'"); } catch (e) {}
 
   save();
   return db;

@@ -75,6 +75,18 @@ function getShareUrl() {
 }
 
 /**
+ * Extracts the LinkedIn job ID from the current URL.
+ * @returns {string}
+ */
+function getLinkedInJobId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromParam = urlParams.get('currentJobId');
+  if (fromParam) return fromParam;
+  const match = window.location.pathname.match(/\/jobs\/view\/(\d+)/);
+  return match ? match[1] : '';
+}
+
+/**
  * Gets the apply URL from the DOM.
  * @returns {string}
  */
@@ -234,18 +246,19 @@ function getJobLocation() {
 
 /**
  * Parses job data from the current page DOM.
- * @returns {{ role: string, company: string, url: string, apply_url: string, jobType: string, location: string, description: string, posted_at: string }}
+ * @returns {{ role: string, company: string, url: string, apply_url: string, jobType: string, location: string, description: string, posted_at: string, linkedin_job_id: string }}
  */
 function parseJobData() {
   const role = trySelectors(ROLE_SELECTORS) || 'Unknown';
   const company = trySelectors(COMPANY_SELECTORS) || 'Unknown';
   const jobType = getJobType();
   const url = getShareUrl();
+  const linkedin_job_id = getLinkedInJobId();
   const apply_url = getApplyUrl();
   const location = getJobLocation();
   const description = getJobDescription();
   const posted_at = getPostedDate();
-  return { role, company, url, apply_url, jobType, location, description, posted_at };
+  return { role, company, url, linkedin_job_id, apply_url, jobType, location, description, posted_at };
 }
 
 // Message listener
@@ -260,3 +273,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// ── URL change detection (LinkedIn SPA navigation) ─────
+let lastTrackedUrl = location.href;
+
+function notifyUrlChange() {
+  const current = location.href;
+  if (current !== lastTrackedUrl) {
+    lastTrackedUrl = current;
+    try {
+      chrome.runtime.sendMessage({ action: 'urlChanged', url: current });
+    } catch (e) {}
+  }
+}
+
+// Try to intercept history API (may be restricted in Safari)
+try {
+  const wrap = (method) => {
+    const original = history[method];
+    history[method] = function (...args) {
+      const result = original.apply(this, args);
+      notifyUrlChange();
+      return result;
+    };
+  };
+  wrap('pushState');
+  wrap('replaceState');
+} catch (e) {}
+
+// Catch back/forward navigation
+window.addEventListener('popstate', notifyUrlChange);
+
+// Fallback: MutationObserver on <title> — LinkedIn updates it on job switch
+const titleObserver = new MutationObserver(() => notifyUrlChange());
+const titleEl = document.querySelector('title');
+if (titleEl) {
+  titleObserver.observe(titleEl, { childList: true });
+}
+
+// Also poll URL every second as last resort
+setInterval(notifyUrlChange, 1000);
