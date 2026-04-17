@@ -18,6 +18,7 @@ safari-extension/build/
 
 # Test/Source files
 linkedin_source.html
+indeed_source.html
 
 # IDE
 .vscode/

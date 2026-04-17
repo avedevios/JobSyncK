@@ -14,7 +14,7 @@
 
   <!-- State: not a job page -->
   <div id="state-not-job-page" class="state hidden">
-    <p class="info">Open a LinkedIn job listing to save it.</p>
+    <p class="info">Open a LinkedIn or Indeed job listing to save it.</p>
   </div>
 
   <!-- State: data fetch error -->
@@ -59,6 +59,12 @@
     <div class="field">
       <label>Description</label>
       <span id="field-description" class="desc-truncated"></span>
+    </div>
+
+    <!-- Similar warning -->
+    <div id="similar-warning" class="warning hidden" style="background:#fffbeb;border-color:#f59e0b;color:#92400e;">
+      ⚠️ Similar jobs already saved:
+      <ul id="similar-list" style="margin-top:6px;padding-left:16px;font-size:11px;"></ul>
     </div>
 
     <!-- Duplicate warning -->

@@ -1,9 +1,11 @@
-// Matches /jobs/view/... and /jobs/search-results/?currentJobId=...
-const JOB_PAGE_PATTERN = /^https:\/\/www\.linkedin\.com\/jobs\/(view\/|search-results\/.*[?&]currentJobId=)/;
+// Matches LinkedIn job pages and Indeed job pages
+const JOB_PAGE_PATTERN = /^https:\/\/(www\.linkedin\.com\/jobs\/(view\/|search-results\/.*[?&]currentJobId=)|(ca|www)\.indeed\.com\/(viewjob|jobs|).*[?&](jk|vjk)=)/;
 const DATA_TIMEOUT_MS = 5000;
 
 function isJobPage(url) {
-  return JOB_PAGE_PATTERN.test(url);
+  const result = JOB_PAGE_PATTERN.test(url);
+  console.log('[JobSaver] isJobPage:', result, url);
+  return result;
 }
 
 function showState(stateId) {
@@ -13,7 +15,7 @@ function showState(stateId) {
 }
 
 function fillFields(data) {
-  document.getElementById('field-job-id').textContent = data.linkedin_job_id || '—';
+  document.getElementById('field-job-id').textContent = data.linkedin_job_id || data.indeed_job_id || '—';
   document.getElementById('field-role').textContent = data.role;
   document.getElementById('field-company').textContent = data.company;
   document.getElementById('field-jobtype').textContent = data.jobType || '';
@@ -22,6 +24,15 @@ function fillFields(data) {
   document.getElementById('field-location').textContent = data.location || 'Unknown';
   document.getElementById('field-posted').textContent = data.posted_at || 'Unknown';
   document.getElementById('field-description').textContent = data.description ? data.description.substring(0, 150) + '...' : 'No description found';
+}
+
+function showSimilarWarning(similar) {
+  const el = document.getElementById('similar-warning');
+  const list = document.getElementById('similar-list');
+  list.innerHTML = similar.map(v =>
+    `<li><a href="${v.url}" target="_blank">${v.role} — ${v.company} (${v.status})</a></li>`
+  ).join('');
+  el.classList.remove('hidden');
 }
 
 function showDuplicateWarning() {
@@ -82,7 +93,7 @@ async function saveJob(data) {
     applied: false,
     status: 'saved',
     url: data.url,
-    linkedin_job_id: data.linkedin_job_id || "",
+    linkedin_job_id: data.linkedin_job_id || data.indeed_job_id || "",
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
     location: data.location || "",
@@ -112,7 +123,7 @@ async function updateJob(id, data) {
     applied: false,
     status: 'saved',
     url: data.url,
-    linkedin_job_id: data.linkedin_job_id || "",
+    linkedin_job_id: data.linkedin_job_id || data.indeed_job_id || "",
     apply_url: data.apply_url || "",
     job_type: data.jobType || "",
     location: data.location || "",
@@ -185,12 +196,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const dupResult = await sendMessageToBackground({
       action: 'checkDuplicate',
-      linkedinJobId: jobData.data.linkedin_job_id,
+      linkedinJobId: jobData.data.linkedin_job_id || jobData.data.indeed_job_id,
       url: jobData.data.url,
+      description: jobData.data.description,
     });
     if (dupResult && dupResult.isDuplicate) {
       showDuplicateWarning();
       document.getElementById('btn-update').addEventListener('click', () => updateJob(dupResult.existingId, jobData.data));
+    }
+    if (dupResult && dupResult.similarVacancies && dupResult.similarVacancies.length > 0) {
+      showSimilarWarning(dupResult.similarVacancies);
     }
   } catch {
     // fail-open: ignore duplicate check errors

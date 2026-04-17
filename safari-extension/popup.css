@@ -137,3 +137,12 @@ p.info {
   text-align: center;
   padding: 8px 0;
 }
+
+#similar-warning a {
+  color: #92400e;
+  font-size: 11px;
+}
+
+#similar-warning a:hover {
+  text-decoration: underline;
+}

@@ -107,10 +107,13 @@
     th.sorted .sort-icon { opacity: 1; color: #0a66c2; }
 
     td { padding: 13px 14px; border-top: 1px solid #f0f0f0; vertical-align: middle; }
-    .actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+    .actions { display: flex; gap: 4px; align-items: stretch; flex-wrap: nowrap; }
+    .actions-cell { white-space: nowrap; width: 1%; padding: 4px 8px; }
     tr:hover td { background: #f8fbff; cursor: pointer; }
     tr.remote-row td { background: #fff0f0; }
     tr.remote-row:hover td { background: #ffd6d6; }
+    tr.similar-row td { background: #fffbeb; }
+    tr.similar-row:hover td { background: #fef3c7; }
 
     .role-cell { font-weight: 500; max-width: 200px; }
     .company-cell { color: #444; }
@@ -136,7 +139,7 @@
     .badge-offer     { background: #d1fae5; color: #059669; }
     .badge-archived  { background: #f3f4f6; color: #6b7280; }
 
-    .actions { display: flex; gap: 6px; }
+    .actions { display: flex; gap: 4px; align-items: stretch; }
     .btn-icon {
       border: none;
       background: none;
@@ -146,6 +149,11 @@
       font-size: 18px;
       line-height: 1;
       transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
     }
     .btn-icon:hover { background: #f0f0f0; }
     .btn-icon.apply:hover { background: #d1fae5; }
@@ -405,6 +413,10 @@
         <textarea id="edit-interview-dates" placeholder="2026-04-20&#10;2026-04-27"></textarea>
       </div>
     </div>
+    <div id="similar-section" class="hidden" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;">
+      <div style="font-size:12px;font-weight:600;color:#d97706;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">⚠️ Similar vacancies found</div>
+      <ul id="similar-list" style="list-style:none;display:flex;flex-direction:column;gap:6px;"></ul>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-danger-text" id="modal-delete">Delete</button>
       <div style="flex:1"></div>
@@ -460,13 +472,60 @@ let sortDir = -1; // -1 = desc
 let editingId = null;
 let deletingId = null;
 
+// ── Similarity ─────────────────────────────────────────
+function normalizeDesc(text) {
+  return (text || '').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 300);
+}
+
+function similarity(a, b) {
+  const na = normalizeDesc(a);
+  const nb = normalizeDesc(b);
+  if (!na || !nb) return 0;
+  const longer = na.length > nb.length ? na : nb;
+  const shorter = na.length > nb.length ? nb : na;
+  let matches = 0;
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer[i] === shorter[i]) matches++;
+  }
+  return matches / longer.length;
+}
+
+function findSimilar(vacancy) {
+  return allVacancies.filter(v =>
+    v.id !== vacancy.id &&
+    v.description &&
+    vacancy.description &&
+    similarity(v.description, vacancy.description) >= 0.8
+  );
+}
+
+// Build similarity map once per render
+let similarMap = {}; // id -> [similar ids]
+function buildSimilarMap() {
+  similarMap = {};
+  for (const v of allVacancies) {
+    const similar = findSimilar(v);
+    if (similar.length > 0) {
+      similarMap[v.id] = similar.map(s => s.id);
+      console.log('[similar]', v.id, v.role, '->', similarMap[v.id]);
+    }
+  }
+}
+
 // ── Fetch ──────────────────────────────────────────────
 async function loadVacancies() {
   try {
     const res = await fetch(`${API}/vacancies`);
     allVacancies = await res.json();
+    buildSimilarMap();
     updateStats();
     updateLocationFilter();
+    // Default filter: saved
+    if (!document.getElementById('filter-status').value) {
+      document.getElementById('filter-status').value = 'saved';
+      const card = document.querySelector('.stat-card[data-status="saved"]');
+      if (card) card.classList.add('active');
+    }
     renderTable();
   } catch (e) {
     showToast('Could not connect to backend', 'error');
@@ -531,8 +590,10 @@ function renderTable() {
 
   tbody.innerHTML = rows.map(v => {
     const isRemote = /remote/i.test(v.job_type || '') || /remote/i.test(v.location || '');
+    const isSimilar = similarMap[v.id] && similarMap[v.id].length > 0;
+    const rowClass = isRemote ? 'remote-row' : isSimilar ? 'similar-row' : '';
     return `
-    <tr onclick="openEdit(${v.id})"${isRemote ? ' class="remote-row"' : ''}>
+    <tr onclick="openEdit(${v.id})"${rowClass ? ` class="${rowClass}"` : ''}>
       <td class="role-cell">${esc(v.role)}</td>
       <td class="company-cell">${esc(v.company)}</td>
       <td class="location-cell">${esc(v.location || '—')}</td>
@@ -762,6 +823,39 @@ function openEdit(id) {
   let dates = [];
   try { dates = JSON.parse(v.interview_dates || '[]'); } catch {}
   document.getElementById('edit-interview-dates').value = dates.join('\n');
+
+  // Similar vacancies
+  const similarIds = similarMap[id] || [];
+  const similarSection = document.getElementById('similar-section');
+  const similarList = document.getElementById('similar-list');
+  if (similarIds.length > 0) {
+    similarList.innerHTML = similarIds.map(sid => {
+      const sv = allVacancies.find(x => x.id == sid);
+      if (!sv) return '';
+      return `<li style="font-size:13px;">
+        <a href="#" data-similar-id="${sv.id}" style="color:#0a66c2;text-decoration:none;">
+          ${esc(sv.role)} — ${esc(sv.company)} <span style="color:#999;font-size:11px;">(${esc(sv.status)}, ${esc(sv.applied_at || '?')})</span>
+        </a>
+      </li>`;
+    }).join('');
+    // Attach click handlers after rendering
+    similarList.querySelectorAll('a[data-similar-id]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('modal-overlay').classList.remove('open');
+        setTimeout(() => openEdit(parseInt(a.dataset.similarId)), 50);
+      });
+    });
+    const hasItems = similarList.querySelectorAll('li').length > 0;
+    if (hasItems) {
+      similarSection.classList.remove('hidden');
+    } else {
+      similarSection.classList.add('hidden');
+    }
+  } else {
+    similarSection.classList.add('hidden');
+  }
+
   document.getElementById('modal-overlay').classList.add('open');
 }
 

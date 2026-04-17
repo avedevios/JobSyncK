@@ -28,6 +28,54 @@ function findDuplicateId(vacancies, linkedinJobId, url) {
   const found = vacancies.find((v) => v.url === url);
   return found ? found.id : null;
 }
+/**
+ * Normalizes description text for similarity comparison.
+ * @param {string} text
+ * @returns {string}
+ */
+function normalizeDesc(text) {
+  return (text || "").toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 300);
+}
+
+/**
+ * Returns similarity ratio between two descriptions (0..1).
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function descSimilarity(a, b) {
+  const na = normalizeDesc(a);
+  const nb = normalizeDesc(b);
+  if (!na || !nb) return 0;
+  const longer = na.length > nb.length ? na : nb;
+  const shorter = na.length > nb.length ? nb : na;
+  let matches = 0;
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer[i] === shorter[i]) matches++;
+  }
+  return matches / longer.length;
+}
+
+/**
+ * Finds vacancies with similar descriptions (>= 80% match).
+ * @param {Array} vacancies
+ * @param {string} description
+ * @param {string|null} excludeJobId
+ * @returns {Array}
+ */
+function findSimilarVacancies(vacancies, description, excludeJobId) {
+  if (!description) return [];
+  return vacancies.filter((v) => {
+    if (excludeJobId && v.linkedin_job_id === excludeJobId) return false;
+    return v.description && descSimilarity(v.description, description) >= 0.8;
+  }).map((v) => ({
+    id: v.id,
+    role: v.role,
+    company: v.company,
+    status: v.status,
+    url: v.url,
+  }));
+}
 
 /**
  * Builds a VacancyPayload from parsed job data.
@@ -53,24 +101,24 @@ function buildPayload(data) {
 
 /**
  * Checks whether the given job is already saved in the backend.
- * Returns { isDuplicate, existingId } — fail-open on error.
+ * Returns { isDuplicate, existingId, similarVacancies } — fail-open on error.
  * @param {string} linkedinJobId
  * @param {string} url
- * @returns {Promise<{isDuplicate: boolean, existingId: number|null}>}
+ * @param {string} description
+ * @returns {Promise<{isDuplicate: boolean, existingId: number|null, similarVacancies: Array}>}
  */
-async function checkDuplicate(linkedinJobId, url) {
+async function checkDuplicate(linkedinJobId, url, description) {
   try {
     const response = await fetch(`${BACKEND_URL}/vacancies`, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
     const vacancies = await response.json();
     const existingId = findDuplicateId(vacancies, linkedinJobId, url);
-    return { isDuplicate: existingId !== null, existingId };
+    const similarVacancies = findSimilarVacancies(vacancies, description, linkedinJobId);
+    return { isDuplicate: existingId !== null, existingId, similarVacancies };
   } catch {
-    return { isDuplicate: false, existingId: null };
+    return { isDuplicate: false, existingId: null, similarVacancies: [] };
   }
 }
 
@@ -145,7 +193,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.action === "checkDuplicate") {
-    checkDuplicate(message.linkedinJobId, message.url).then((result) => {
+    checkDuplicate(message.linkedinJobId, message.url, message.description).then((result) => {
       sendResponse(result);
     });
     return true;
@@ -175,12 +223,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // ── Tab badge ──────────────────────────────────────────
-const JOB_PAGE_RE = /linkedin\.com\/jobs\/(view\/|search-results\/.*[?&]currentJobId=)/;
+const JOB_PAGE_RE = /linkedin\.com\/jobs\/(view\/|search-results\/.*[?&]currentJobId=)|indeed\.com\/(viewjob|jobs|).*[?&](jk|vjk)=/;
 
 function extractJobIdFromUrl(url) {
   try {
     const u = new URL(url);
-    const fromParam = u.searchParams.get('currentJobId');
+    const fromParam = u.searchParams.get('currentJobId') || u.searchParams.get('jk') || u.searchParams.get('vjk');
     if (fromParam) return fromParam;
     const match = u.pathname.match(/\/jobs\/view\/(\d+)/);
     return match ? match[1] : '';

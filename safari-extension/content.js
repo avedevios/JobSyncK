@@ -263,11 +263,120 @@ function parseJobData() {
   return { role, company, url, linkedin_job_id, apply_url, jobType, location, description, posted_at };
 }
 
+// ── Indeed Parser ──────────────────────────────────────
+
+function getIndeedJobId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('jk') || urlParams.get('vjk') ||
+    (document.querySelector('[data-jk]') || {}).getAttribute?.('data-jk') || '';
+}
+
+function parseIndeedJobData() {
+  // Role — use data-testid first (works in both SPA and viewjob),
+  // fallback to aria-label on job title link, then JSON data
+  let role = 'Unknown';
+  const titleEl = document.querySelector('[data-testid="jobsearch-JobInfoHeader-title"]');
+  if (titleEl) {
+    // grab first span text to avoid nested badges
+    const span = titleEl.querySelector('span');
+    role = (span || titleEl).textContent.trim();
+  } else {
+    // Try aria-label on job title link: "full details of <Role>"
+    const titleLink = document.querySelector('a[aria-label^="full details of"]');
+    if (titleLink) {
+      role = titleLink.getAttribute('aria-label')
+        .replace(/^full details of\s*/i, '')
+        .replace(/\s*-\s*job post\s*$/i, '')
+        .trim();
+    } else {
+      // Try JSON embedded in page
+      const scripts = document.querySelectorAll('script');
+      for (const s of scripts) {
+        const m = s.textContent.match(/"title"\s*:\s*"([^"]+)"/);
+        if (m) { role = m[1]; break; }
+      }
+    }
+  }
+
+  // Clean up role
+  role = role.replace(/\s*-\s*job post\s*$/i, '').trim();
+
+  // Company
+  let company = 'Unknown';
+  const companyEl = document.querySelector('[data-testid="inlineHeader-companyName"], [data-company-name="true"]');
+  if (companyEl) company = companyEl.textContent.trim();
+
+  // Location
+  let location = '';
+  const locationEl = document.querySelector('[data-testid="job-location"], [data-testid="inlineHeader-companyLocation"]');
+  if (locationEl) location = locationEl.textContent.trim();
+
+  // Description
+  let description = '';
+  const descEl = document.querySelector('#jobDescriptionText, [class*="jobDescriptionText"]');
+  if (descEl) description = (descEl.innerText || descEl.textContent).trim();
+
+  // Job type
+  let jobType = '';
+  const validTypes = ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Permanent', 'Internship'];
+  document.querySelectorAll('span, li').forEach(el => {
+    const text = el.textContent.trim();
+    if (validTypes.some(t => text.toLowerCase() === t.toLowerCase())) jobType = text;
+  });
+
+  // Posted date — from JSON data embedded in page
+  let posted_at = '';
+  const allScripts = document.querySelectorAll('script');
+  for (const s of allScripts) {
+    const m = s.textContent.match(/"datePublished"\s*:\s*(\d+)/);
+    if (m) {
+      const ts = parseInt(m[1]);
+      if (ts > 1000000000000) { // ms timestamp
+        posted_at = new Date(ts).toISOString().split('T')[0];
+      } else if (ts > 1000000000) { // s timestamp
+        posted_at = new Date(ts * 1000).toISOString().split('T')[0];
+      }
+      if (posted_at) break;
+    }
+  }
+
+  // Apply URL — try DOM first, then JSON
+  const jk = getIndeedJobId();
+  const host = window.location.host;
+  const url = jk ? `https://${host}/viewjob?jk=${jk}` : window.location.href;
+
+  let apply_url = url;
+  const applyBtn = document.querySelector('[data-indeed-apply-posturl]');
+  if (applyBtn) {
+    apply_url = applyBtn.getAttribute('data-indeed-apply-posturl') || url;
+  } else {
+    const extApplyLink = document.querySelector('a[href*="applystart"], a[aria-label*="company site"]');
+    if (extApplyLink) {
+      apply_url = extApplyLink.href;
+    } else {
+      for (const s of allScripts) {
+        const m = s.textContent.match(/"thirdPartyApplyUrl"\s*:\s*"([^"]+)"/);
+        if (m) {
+          // Fix escaped unicode slashes (\u002F -> /)
+          apply_url = m[1].replace(/\\u002F/gi, '/');
+          break;
+        }
+        const m2 = s.textContent.match(/"applyUrl"\s*:\s*"([^"]+)"/);
+        if (m2 && m2[1].startsWith('http')) { apply_url = m2[1]; break; }
+      }
+    }
+  }
+
+  return { role, company, url, indeed_job_id: jk, linkedin_job_id: '', apply_url, jobType, location, description, posted_at, source: 'indeed' };
+}
+
 // Message listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getJobData') {
     try {
-      const data = parseJobData();
+      // Detect source and parse accordingly
+      const isIndeed = /indeed\.com/.test(window.location.hostname);
+      const data = isIndeed ? parseIndeedJobData() : parseJobData();
       sendResponse({ success: true, data });
     } catch (error) {
       sendResponse({ success: false, error: error.message });
